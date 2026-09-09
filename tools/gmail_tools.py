@@ -44,6 +44,67 @@ def gmail_search(query: str, max_results: int = 10) -> dict:
         return {"ok": False, "output": f"gmail_search failed: {e}"}
 
 
+def _extract_body(payload: dict) -> str:
+    """Walk a Gmail message payload to find the best plain-text body.
+    Falls back to the snippet-level text if no text/plain part exists
+    (e.g. HTML-only emails) rather than failing outright."""
+    import base64
+
+    def decode(data: str) -> str:
+        return base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)).decode("utf-8", errors="replace")
+
+    def walk(part: dict):
+        mime = part.get("mimeType", "")
+        body = part.get("body", {})
+        if mime == "text/plain" and body.get("data"):
+            return decode(body["data"])
+        for sub in part.get("parts", []) or []:
+            found = walk(sub)
+            if found:
+                return found
+        # Last resort: HTML body, still better than nothing for triage judgment.
+        if mime == "text/html" and body.get("data"):
+            return decode(body["data"])
+        return None
+
+    return walk(payload) or ""
+
+
+def gmail_read(message_id: str) -> dict:
+    """Fetch the full body of a message (not just the search snippet)
+    — needed before making a triage decision on anything ambiguous.
+    Arguments: message_id (string, required)."""
+    try:
+        service = gmail_client()
+        msg = (
+            service.users()
+            .messages()
+            .get(userId="me", id=message_id, format="full")
+            .execute()
+        )
+        payload = msg.get("payload", {})
+        headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
+        body_text = _extract_body(payload)
+        # Keep this bounded — full HTML emails can be huge, and the
+        # calling model only needs enough to make a judgment call, not
+        # the entire raw email.
+        if len(body_text) > 5000:
+            body_text = body_text[:5000] + "\n... [truncated]"
+        return {
+            "ok": True,
+            "output": {
+                "id": message_id,
+                "from": headers.get("From"),
+                "subject": headers.get("Subject"),
+                "date": headers.get("Date"),
+                "labels": msg.get("labelIds", []),
+                "body": body_text,
+            },
+        }
+    except Exception as e:
+        return {"ok": False, "output": f"gmail_read failed: {e}"}
+
+
 def gmail_send(to: str, subject: str, body: str) -> dict:
     """Send a plain-text email."""
     import base64
