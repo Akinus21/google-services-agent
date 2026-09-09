@@ -27,7 +27,15 @@ from flask import Flask, request, jsonify
 sys.path.insert(0, os.path.dirname(__file__))
 
 from auth.google_auth import is_configured as google_configured
-from tools.gmail_tools import gmail_search, gmail_send, gmail_archive
+from tools.gmail_tools import (
+    gmail_search,
+    gmail_send,
+    gmail_archive,
+    gmail_label,
+    gmail_star,
+    gmail_trash,
+    gmail_untrash,
+)
 from tools.calendar_tools import calendar_list_events, calendar_create_event
 
 app = Flask(__name__)
