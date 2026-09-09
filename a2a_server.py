@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from auth.google_auth import is_configured as google_configured
 from tools.gmail_tools import (
     gmail_search,
+    gmail_read,
     gmail_send,
     gmail_archive,
     gmail_label,
@@ -70,6 +71,14 @@ def _tool_defs():
             "exec": lambda a: gmail_search(a.get("query", ""), a.get("max_results", 10)),
         },
         {
+            "id": "gmail_read",
+            "name": "Gmail Read",
+            "description": "Fetch the full body of a message (not just the search snippet) — use before making any judgment call on an ambiguous email. Arguments: message_id (string, required).",
+            "tags": ["gmail", "read"],
+            "available": google_configured(),
+            "exec": lambda a: gmail_read(a.get("message_id", "")),
+        },
+        {
             "id": "gmail_send",
             "name": "Gmail Send",
             "description": "Send a plain-text email. Arguments: to (string, required), subject (string, required), body (string, required).",
@@ -85,7 +94,7 @@ def _tool_defs():
             "available": google_configured(),
             "exec": lambda a: gmail_archive(a.get("message_id", "")),
         },
-                {
+        {
             "id": "gmail_label",
             "name": "Gmail Label",
             "description": "Add and/or remove labels on a message by human-readable label name (e.g. 'Important', 'Work', or system labels like 'UNREAD'). Arguments: message_id (string, required), add (array of label name strings, optional), remove (array of label name strings, optional) — at least one of add/remove is required.",
