@@ -22,6 +22,16 @@ from tools.calendar_tools import calendar_list_events, calendar_create_event
 import mesh
 
 
+def _get_message_id(a: dict) -> str:
+    """Accept both 'message_id' (our documented schema) and bare 'id'
+    (what Gmail's own API calls it, and a very natural mistake for a
+    caller to make) — a mismatch here used to silently fall through to
+    an empty string via a.get('message_id', ''), which then got sent
+    straight to Google's API as an empty id, producing a confusing
+    "'id' required" error instead of a clear one at our own layer."""
+    return a.get("message_id") or a.get("id") or ""
+
+
 def tool_defs():
     return [
         {
@@ -46,7 +56,7 @@ def tool_defs():
             "description": "Fetch the full body of a message (not just the search snippet) — use before making any judgment call on an ambiguous email.",
             "tags": ["gmail", "read"],
             "available": google_configured(),
-            "exec": lambda a: gmail_read(a.get("message_id", "")),
+            "exec": lambda a: gmail_read(_get_message_id(a)),
             "params_schema": {
                 "type": "object",
                 "properties": {"message_id": {"type": "string"}},
@@ -76,7 +86,7 @@ def tool_defs():
             "description": "Archive a message by id (removes from inbox, does not delete).",
             "tags": ["gmail", "write"],
             "available": google_configured(),
-            "exec": lambda a: gmail_archive(a.get("message_id", "")),
+            "exec": lambda a: gmail_archive(_get_message_id(a)),
             "params_schema": {
                 "type": "object",
                 "properties": {"message_id": {"type": "string"}},
@@ -89,7 +99,7 @@ def tool_defs():
             "description": "Add and/or remove labels on a message by human-readable label name (e.g. 'Important', 'Work', or system labels like 'UNREAD'). At least one of add/remove is required.",
             "tags": ["gmail", "write"],
             "available": google_configured(),
-            "exec": lambda a: gmail_label(a.get("message_id", ""), a.get("add", []), a.get("remove", [])),
+            "exec": lambda a: gmail_label(_get_message_id(a), a.get("add", []), a.get("remove", [])),
             "params_schema": {
                 "type": "object",
                 "properties": {
@@ -106,7 +116,7 @@ def tool_defs():
             "description": "Star or unstar a message.",
             "tags": ["gmail", "write"],
             "available": google_configured(),
-            "exec": lambda a: gmail_star(a.get("message_id", ""), a.get("starred", True)),
+            "exec": lambda a: gmail_star(_get_message_id(a), a.get("starred", True)),
             "params_schema": {
                 "type": "object",
                 "properties": {
@@ -122,7 +132,7 @@ def tool_defs():
             "description": "Move a message to Trash (reversible for ~30 days — NOT permanent delete).",
             "tags": ["gmail", "write"],
             "available": google_configured(),
-            "exec": lambda a: gmail_trash(a.get("message_id", "")),
+            "exec": lambda a: gmail_trash(_get_message_id(a)),
             "params_schema": {
                 "type": "object",
                 "properties": {"message_id": {"type": "string"}},
@@ -135,7 +145,7 @@ def tool_defs():
             "description": "Restore a message out of Trash.",
             "tags": ["gmail", "write"],
             "available": google_configured(),
-            "exec": lambda a: gmail_untrash(a.get("message_id", "")),
+            "exec": lambda a: gmail_untrash(_get_message_id(a)),
             "params_schema": {
                 "type": "object",
                 "properties": {"message_id": {"type": "string"}},
