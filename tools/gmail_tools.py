@@ -62,7 +62,6 @@ def _extract_body(payload: dict) -> str:
             found = walk(sub)
             if found:
                 return found
-        # Last resort: HTML body, still better than nothing for triage judgment.
         if mime == "text/html" and body.get("data"):
             return decode(body["data"])
         return None
@@ -74,6 +73,8 @@ def gmail_read(message_id: str) -> dict:
     """Fetch the full body of a message (not just the search snippet)
     — needed before making a triage decision on anything ambiguous.
     Arguments: message_id (string, required)."""
+    if not message_id or not message_id.strip():
+        return {"ok": False, "output": "message_id is required and cannot be empty"}
     try:
         service = gmail_client()
         msg = (
@@ -85,9 +86,6 @@ def gmail_read(message_id: str) -> dict:
         payload = msg.get("payload", {})
         headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
         body_text = _extract_body(payload)
-        # Keep this bounded — full HTML emails can be huge, and the
-        # calling model only needs enough to make a judgment call, not
-        # the entire raw email.
         if len(body_text) > 5000:
             body_text = body_text[:5000] + "\n... [truncated]"
         return {
@@ -124,6 +122,8 @@ def gmail_send(to: str, subject: str, body: str) -> dict:
 
 def gmail_archive(message_id: str) -> dict:
     """Archive a message by removing it from INBOX (does not delete)."""
+    if not message_id or not message_id.strip():
+        return {"ok": False, "output": "message_id is required and cannot be empty"}
     try:
         service = gmail_client()
         service.users().messages().modify(
@@ -165,7 +165,6 @@ def _resolve_label_ids(service, names: list) -> tuple:
             unresolved.append(name)
 
     if unresolved:
-        # Refresh once — the label(s) may have been created recently.
         _label_cache["data"] = _fetch_labels(service)
         by_name = _label_cache["data"]
         still_unresolved = []
@@ -185,6 +184,8 @@ def gmail_label(message_id: str, add: list = None, remove: list = None) -> dict:
     name (e.g. 'Important', 'Work', or system labels like 'UNREAD').
     Arguments: message_id (string, required), add (array of label
     names, optional), remove (array of label names, optional)."""
+    if not message_id or not message_id.strip():
+        return {"ok": False, "output": "message_id is required and cannot be empty"}
     add = add or []
     remove = remove or []
     if not add and not remove:
@@ -211,6 +212,8 @@ def gmail_star(message_id: str, starred: bool = True) -> dict:
     """Star or unstar a message. Arguments: message_id (string,
     required), starred (boolean, optional, default true — pass false
     to unstar)."""
+    if not message_id or not message_id.strip():
+        return {"ok": False, "output": "message_id is required and cannot be empty"}
     try:
         service = gmail_client()
         body = {"addLabelIds": ["STARRED"]} if starred else {"removeLabelIds": ["STARRED"]}
@@ -224,6 +227,8 @@ def gmail_trash(message_id: str) -> dict:
     """Move a message to Trash (reversible for ~30 days, then Gmail
     auto-empties it — this is NOT permanent delete, which stays out of
     scope for this agent by design). Arguments: message_id (string, required)."""
+    if not message_id or not message_id.strip():
+        return {"ok": False, "output": "message_id is required and cannot be empty"}
     try:
         service = gmail_client()
         service.users().messages().trash(userId="me", id=message_id).execute()
@@ -234,6 +239,8 @@ def gmail_trash(message_id: str) -> dict:
 
 def gmail_untrash(message_id: str) -> dict:
     """Restore a message out of Trash. Arguments: message_id (string, required)."""
+    if not message_id or not message_id.strip():
+        return {"ok": False, "output": "message_id is required and cannot be empty"}
     try:
         service = gmail_client()
         service.users().messages().untrash(userId="me", id=message_id).execute()
