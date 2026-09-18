@@ -38,6 +38,8 @@ from tools.registry import available_tools, execute_tool, find_tool
 import agent_loop
 import context.store as context_store
 import mesh
+from oauth_self_service import oauth_bp
+app.register_blueprint(oauth_bp)
 
 app = Flask(__name__)
 
