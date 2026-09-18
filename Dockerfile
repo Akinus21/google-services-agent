@@ -15,6 +15,8 @@ COPY context ./context
 COPY a2a_server.py .
 COPY agent_loop.py .
 COPY mesh.py .
+COPY oauth_self_service.py .
+COPY reauth_notifier.py .
 
 # token.json, context.db, and any future state live in the mounted
 # /data volume — never baked into the image.
