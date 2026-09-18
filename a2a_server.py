@@ -39,9 +39,9 @@ import agent_loop
 import context.store as context_store
 import mesh
 from oauth_self_service import oauth_bp
-app.register_blueprint(oauth_bp)
 
 app = Flask(__name__)
+app.register_blueprint(oauth_bp)
 
 BEARER_TOKEN = os.environ.get("A2A_STATIC_AUTH_TOKEN")
 MESH_TOKEN = os.environ.get("MESH_AUTH_TOKEN")
