@@ -72,7 +72,6 @@ def _build_flow(code_verifier: str | None = None) -> Flow:
 def authorize():
     flow = _build_flow()
     state = secrets.token_urlsafe(24)
-    _pending_states[state] = flow.code_verifier
 
     auth_url, _ = flow.authorization_url(
         access_type="offline",       # required to get a refresh token
@@ -81,6 +80,11 @@ def authorize():
         include_granted_scopes="true",
         state=state,
     )
+    # autogenerate_code_verifier only populates flow.code_verifier as a
+    # side effect of the authorization_url() call above — must capture it
+    # AFTER calling authorization_url(), not before, or it's still None.
+    _pending_states[state] = flow.code_verifier
+
     log.info("OAuth authorize requested, redirecting to Google consent screen")
     return redirect(auth_url)
 
