@@ -47,22 +47,32 @@ GOOGLE_TOKEN_PATH = os.environ.get("GOOGLE_TOKEN_PATH", "/data/google-token.json
 PUBLIC_BASE_URL = os.environ["OAUTH_PUBLIC_BASE_URL"]  # e.g. http://10.200.200.5:8200
 REDIRECT_URI = f"{PUBLIC_BASE_URL}/oauth/callback"
 
-# In-memory CSRF state store. Fine for single-operator use; if this needs
-# to survive a restart mid-flow, swap for a one-row sqlite/file check.
-_pending_states: set[str] = set()
+# In-memory CSRF state store, now also holding the PKCE code_verifier
+# generated for each authorize request — Google now requires PKCE, and
+# since authorize/callback build separate Flow objects, the verifier has
+# to be threaded through manually rather than relying on Flow to remember
+# it. Fine for single-operator use; if this needs to survive a restart
+# mid-flow, swap for a one-row sqlite/file store instead.
+_pending_states: dict[str, str] = {}  # state -> code_verifier
 
 
-def _build_flow() -> Flow:
-    return Flow.from_client_secrets_file(
-        CLIENT_SECRET_PATH, scopes=SCOPES, redirect_uri=REDIRECT_URI
+def _build_flow(code_verifier: str | None = None) -> Flow:
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRET_PATH,
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI,
+        autogenerate_code_verifier=(code_verifier is None),
     )
+    if code_verifier is not None:
+        flow.code_verifier = code_verifier
+    return flow
 
 
 @oauth_bp.route("/oauth/authorize", methods=["GET"])
 def authorize():
     flow = _build_flow()
     state = secrets.token_urlsafe(24)
-    _pending_states.add(state)
+    _pending_states[state] = flow.code_verifier
 
     auth_url, _ = flow.authorization_url(
         access_type="offline",       # required to get a refresh token
@@ -81,14 +91,14 @@ def callback():
     if not state or state not in _pending_states:
         log.warning("OAuth callback with unknown/missing state — rejecting")
         abort(400, "invalid or expired state")
-    _pending_states.discard(state)
+    code_verifier = _pending_states.pop(state)
 
     error = request.args.get("error")
     if error:
         log.error("OAuth consent denied or errored: %s", error)
         return f"Consent failed: {error}", 400
 
-    flow = _build_flow()
+    flow = _build_flow(code_verifier=code_verifier)
     try:
         # authorization_response must be the full callback URL Google hit,
         # including query string — request.url gives that.
@@ -109,4 +119,3 @@ def callback():
         "<p>google-services-agent has a fresh token. You can close this tab.</p>"
         "</body></html>"
     )
-
